@@ -23,6 +23,8 @@ juce_add_plugin(FlowSidechain
     EDITOR_WANTS_KEYBOARD_FOCUS FALSE
     COPY_PLUGIN_AFTER_BUILD FALSE)
 
+juce_generate_juce_header(FlowSidechain)
+
 target_sources(FlowSidechain PRIVATE
     Source/PluginProcessor.cpp
     Source/PluginEditor.cpp)
