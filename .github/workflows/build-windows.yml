@@ -1,0 +1,47 @@
+name: Build Windows VST3
+
+on:
+  push:
+    branches: [ main, master ]
+    tags: [ 'v*' ]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+      - name: Configure
+        run: cmake -S . -B build -A x64 -DCMAKE_BUILD_TYPE=Release
+      - name: Build VST3
+        run: cmake --build build --config Release --target FlowSidechain_VST3 --parallel
+      - name: Package installable plug-in
+        shell: pwsh
+        run: |
+          $bundle = Get-ChildItem -Path build -Directory -Recurse -Filter 'Flow Sidechain.vst3' | Select-Object -First 1
+          if (-not $bundle) { throw 'VST3 bundle not found after build.' }
+          $package = Join-Path $PWD 'package'
+          New-Item -ItemType Directory -Path $package | Out-Null
+          Copy-Item -LiteralPath $bundle.FullName -Destination $package -Recurse
+          Copy-Item README.md, Install.bat, Install.ps1 -Destination $package
+          Compress-Archive -Path (Join-Path $package '*') -DestinationPath FlowSidechain-VST3-Windows.zip -Force
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: FlowSidechain-VST3-Windows
+          path: FlowSidechain-VST3-Windows.zip
+          if-no-files-found: error
+      - name: Publish tagged release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: gh release create "${{ github.ref_name }}" FlowSidechain-VST3-Windows.zip --title "Flow Sidechain ${{ github.ref_name }}" --notes "Windows VST3 installer package. Extract the ZIP and run Install.bat."
+
